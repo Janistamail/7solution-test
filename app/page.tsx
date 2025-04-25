@@ -1,103 +1,164 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCallback, useRef, useState } from "react";
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+type ItemType = "Fruit" | "Vegetable";
+
+interface TodoItem {
+  type: ItemType;
+  name: string;
+  timeLeft?: number;
+  timerId?: NodeJS.Timeout;
+}
+
+const INITIAL_ITEMS: TodoItem[] = [
+  { type: "Fruit", name: "Apple" },
+  { type: "Vegetable", name: "Broccoli" },
+  { type: "Vegetable", name: "Mushroom" },
+  { type: "Fruit", name: "Banana" },
+  { type: "Vegetable", name: "Tomato" },
+  { type: "Fruit", name: "Orange" },
+  { type: "Fruit", name: "Mango" },
+  { type: "Fruit", name: "Pineapple" },
+  { type: "Vegetable", name: "Cucumber" },
+  { type: "Fruit", name: "Watermelon" },
+  { type: "Vegetable", name: "Carrot" },
+];
+
+const COUNTDOWN_DURATION = 5;
+
+export default function TodoList() {
+  const [mainList, setMainList] = useState<TodoItem[]>(INITIAL_ITEMS);
+  const [fruitItems, setFruitItems] = useState<TodoItem[]>([]);
+  const [vegetableItems, setVegetableItems] = useState<TodoItem[]>([]);
+  const lastUpdateTimeRef = useRef<number>(Date.now());
+
+  const clearTimer = useCallback((item: TodoItem) => {
+    if (item.timerId) {
+      clearTimeout(item.timerId);
+    }
+  }, []);
+
+  const returnToMainList = useCallback(
+    (item: TodoItem) => {
+      clearTimer(item);
+
+      const { timerId, ...itemWithoutTimer } = item;
+      setMainList((prev) => [...prev, itemWithoutTimer]);
+
+      if (item.type === "Fruit") {
+        setFruitItems((prev) => prev.filter((i) => i.name !== item.name));
+      } else {
+        setVegetableItems((prev) => prev.filter((i) => i.name !== item.name));
+      }
+    },
+    [clearTimer]
+  );
+
+  const moveToTypeColumn = useCallback(
+    (item: TodoItem, index: number) => {
+      setMainList((prev) => prev.filter((_, i) => i !== index));
+
+      const timerId = setTimeout(
+        () => returnToMainList({ ...item, timerId: undefined }),
+        COUNTDOWN_DURATION * 1000
+      );
+
+      const itemWithTimer = {
+        ...item,
+        timeLeft: COUNTDOWN_DURATION,
+        timerId,
+      };
+
+      if (item.type === "Fruit") {
+        setFruitItems((prev) => [...prev, itemWithTimer]);
+      } else {
+        setVegetableItems((prev) => [...prev, itemWithTimer]);
+      }
+    },
+    [returnToMainList]
+  );
+
+  const updateTimers = useCallback(() => {
+    const now = Date.now();
+    const elapsedSeconds = Math.floor((now - lastUpdateTimeRef.current) / 1000);
+    lastUpdateTimeRef.current = now;
+
+    if (elapsedSeconds <= 0) return;
+
+    setFruitItems((prev) =>
+      prev.map((item) => ({
+        ...item,
+        timeLeft: Math.max(
+          0,
+          (item.timeLeft ?? COUNTDOWN_DURATION) - elapsedSeconds
+        ),
+      }))
+    );
+
+    setVegetableItems((prev) =>
+      prev.map((item) => ({
+        ...item,
+        timeLeft: Math.max(
+          0,
+          (item.timeLeft ?? COUNTDOWN_DURATION) - elapsedSeconds
+        ),
+      }))
+    );
+  }, []);
+
+  const renderItemButton = (item: TodoItem, onClick: () => void) => {
+    // Update timers before rendering
+    updateTimers();
+
+    return (
+      <Button
+        key={item.name}
+        variant={"outline"}
+        className={`w-full justify-start`}
+        onClick={onClick}
+      >
+        {item.name}
+      </Button>
+    );
+  };
+
+  const renderCategoryCard = (title: string) => (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {(title === "Fruit" ? fruitItems : vegetableItems).map((item) =>
+            renderItemButton(item, () => returnToMainList(item))
+          )}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-6 text-center">Todo List</h1>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Main List</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {mainList.map((item, index) =>
+                renderItemButton(item, () => moveToTypeColumn(item, index))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        {renderCategoryCard("Fruit")}
+        {renderCategoryCard("Vegetable")}
+      </div>
     </div>
   );
 }
