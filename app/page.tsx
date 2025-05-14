@@ -110,7 +110,6 @@ export default function TodoList() {
   }, []);
 
   const renderItemButton = (item: TodoItem, onClick: () => void) => {
-    // Update timers before rendering
     updateTimers();
 
     return (
